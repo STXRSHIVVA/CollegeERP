@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const statusBadge = (status) => {
   const v = String(status || '').toLowerCase()
@@ -35,6 +35,8 @@ const FeeManagement = () => {
   const [method, setMethod] = useState('')
   const [status, setStatus] = useState('')
   const [dateRange, setDateRange] = useState('')
+  const [nameMap, setNameMap] = useState({})
+  const fetchedNameIdsRef = useRef(new Set())
 
   const fetchFees = useCallback(() => {
     const baseURL = import.meta.env.VITE_APPS_SCRIPT_URL
@@ -114,6 +116,66 @@ const FeeManagement = () => {
     return cleanup
   }, [fetchFees])
 
+  useEffect(() => {
+    // Enrich missing student names using getStudentDetails for each ApplicationID
+    const baseURL = import.meta.env.VITE_APPS_SCRIPT_URL
+    if (!baseURL || !Array.isArray(transactions) || transactions.length === 0) return
+
+    const toFetch = []
+    for (const t of transactions) {
+      const haveName = !!pick(t, ['StudentName', 'studentName', 'Student', 'student', 'ApplicantName', 'applicantName', 'Applicant', 'applicant', 'Name', 'name'])
+      const appId = pick(t, ['ApplicationID', 'applicationId', 'ApplicationId'])
+      if (!haveName && appId && !fetchedNameIdsRef.current.has(appId)) {
+        toFetch.push(appId)
+        if (toFetch.length >= 15) break // cap per batch
+      }
+    }
+    if (toFetch.length === 0) return
+
+    const fetchDetailsJSONP = (id, cbName, elId, timeoutMs = 12000) => new Promise((resolve, reject) => {
+      let timerId
+      const cleanup = () => {
+        const el = document.getElementById(elId)
+        if (el && el.parentNode) el.parentNode.removeChild(el)
+        try { delete window[cbName] } catch { /* ignore */ }
+        if (timerId) clearTimeout(timerId)
+      }
+      window[cbName] = (data) => { cleanup(); resolve(data) }
+      const script = document.createElement('script')
+      script.id = elId
+      const sep = baseURL.includes('?') ? '&' : '?'
+      script.src = `${baseURL}${sep}action=getStudentDetails&id=${encodeURIComponent(id)}&callback=${cbName}&_=${Date.now()}`
+      script.async = true
+      script.onerror = () => { cleanup(); reject(new Error('Script load error')) }
+      document.body.appendChild(script)
+      timerId = window.setTimeout(() => { cleanup(); reject(new Error('JSONP request timed out')) }, timeoutMs)
+    })
+
+    const jobs = toFetch.map(async (id) => {
+      fetchedNameIdsRef.current.add(id)
+      try {
+        const cb = `fee_enrich_${id.replace(/[^a-zA-Z0-9_]/g, '_')}_${Date.now() % 1e6}`
+        const elId = `jsonp-fee-enrich-${cb}`
+        const data = await fetchDetailsJSONP(id, cb, elId)
+        // Expect shape like { found, student: { name, firstName, lastName, applicationId } }
+        const s = data && (data.student || data.Student || {})
+        let name = pick(s, ['name', 'Name', 'fullName', 'FullName'])
+        if (!name) {
+          const fn = pick(s, ['firstName', 'FirstName'])
+          const ln = pick(s, ['lastName', 'LastName'])
+          if (fn || ln) name = [fn, ln].filter(Boolean).join(' ').trim()
+        }
+        if (name) {
+          setNameMap((prev) => ({ ...prev, [id]: name }))
+        }
+      } catch {
+        // ignore enrichment failures
+      }
+    })
+
+    void Promise.all(jobs)
+  }, [transactions])
+
   const filtered = useMemo(() => {
     const now = new Date()
     const withinRange = (d) => {
@@ -147,6 +209,7 @@ const FeeManagement = () => {
       const st = pick(t, ['Status', 'status'])
       const pDate = pick(t, ['PaymentDate', 'paymentDate', 'date', 'timestamp', 'createdAt'])
       const desc = pick(t, ['Description', 'description', 'Notes', 'notes'])
+      const enrichedName = pick(t, ['StudentName', 'studentName', 'Student', 'student', 'ApplicantName', 'applicantName', 'Applicant', 'applicant', 'Name', 'name']) || (appId ? nameMap[appId] : '')
 
       const matchesTerm = !term || [
         txnId,
@@ -156,9 +219,8 @@ const FeeManagement = () => {
         st,
         pDate,
         desc,
-        // Keep some legacy fields for search just in case
-        t.studentName,
-        t.student,
+        enrichedName,
+        // legacy
         t.email,
       ]
         .map((x) => String(x || '').toLowerCase())
@@ -176,7 +238,7 @@ const FeeManagement = () => {
 
       return matchesTerm && matchesMethod && matchesStatus && matchesDate
     })
-  }, [transactions, search, method, status, dateRange])
+  }, [transactions, search, method, status, dateRange, nameMap])
 
   const showingText = useMemo(() => {
     const total = filtered.length
@@ -277,7 +339,7 @@ const FeeManagement = () => {
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-500">
                   <th className="px-6 py-4 font-medium">Transaction ID</th>
-                  <th className="px-6 py-4 font-medium">Application ID</th>
+                  <th className="px-6 py-4 font-medium">Student Name</th>
                   <th className="px-6 py-4 font-medium">Amount</th>
                   <th className="px-6 py-4 font-medium">Payment Date</th>
                   <th className="px-6 py-4 font-medium">Payment Method</th>
@@ -295,6 +357,7 @@ const FeeManagement = () => {
                   filtered.map((t, idx) => {
                     const txnId = pick(t, ['TransactionID', 'transactionId', 'txnId', 'TransactionId']) || `TX-${idx+1}`
                     const appId = pick(t, ['ApplicationID', 'applicationId', 'ApplicationId']) || '-'
+                    const studentName = pick(t, ['StudentName', 'studentName', 'Student', 'student', 'ApplicantName', 'applicantName', 'Applicant', 'applicant', 'Name', 'name']) || (appId !== '-' ? nameMap[appId] : '')
                     const amount = pick(t, ['Amount', 'amount', 'FeeAmount', 'feeAmount'])
                     const paymentDate = pick(t, ['PaymentDate', 'paymentDate', 'date', 'timestamp', 'createdAt'])
                     const paymentMethod = pick(t, ['PaymentMethod', 'paymentMethod', 'method']) || '-'
@@ -304,7 +367,7 @@ const FeeManagement = () => {
                     return (
                       <tr key={String(txnId)} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-gray-800 font-medium">{txnId}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-600">{appId}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-600">{studentName || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600">{formatAmount(amount)}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600">{paymentDate ? (typeof paymentDate === 'string' ? paymentDate : new Date(paymentDate).toLocaleString()) : '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600">{paymentMethod}</td>
