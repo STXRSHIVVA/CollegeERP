@@ -30,7 +30,7 @@ export default function LoginPage({ onLogin }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md bg-white shadow rounded-lg p-6">
-        <h1 className="text-2xl font-semibold text-gray-800 mb-1">College ERP</h1>
+        <h1 className="text-2xl font-semibold text-gray-800 mb-1">SVIT COLLEGE</h1>
         <p className="text-gray-500 mb-6">Sign in to continue</p>
         {error && (
           <div className="mb-4 rounded border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">{error}</div>

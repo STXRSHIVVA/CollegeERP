@@ -1,36 +1,71 @@
 import { NavLink, Outlet } from 'react-router-dom'
 
 export default function AppLayout({ user, onLogout }) {
-  const linkBase = 'px-3 py-2 rounded-md text-sm font-medium border';
-  const active = 'bg-blue-600 text-white border-blue-600';
-  const inactive = 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50';
+  const navBase = 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium';
+  const navActive = 'bg-primary-50 text-primary-600';
+  const navInactive = 'text-secondary-600 hover:bg-secondary-100 hover:text-secondary-900';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/vite.svg" className="h-6" alt="logo" />
-            <h1 className="text-lg font-semibold">College ERP</h1>
+    <div className="bg-secondary-50 min-h-screen font-sans">
+      <div className="relative flex min-h-screen w-full overflow-x-hidden">
+        {/* Sidebar */}
+        <aside className="flex w-64 flex-col bg-white border-r border-secondary-200">
+          <div className="flex items-center gap-3 px-6 py-4 text-secondary-800 border-b border-secondary-200">
+            <div className="size-8 text-primary-600">
+              <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path d="M24 8L40 24L24 40L8 24L24 8Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4"></path>
+                <path d="M24 32L16 24L24 16" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4"></path>
+              </svg>
+            </div>
+            <h2 className="text-secondary-900 text-xl font-bold leading-tight tracking-[-0.015em]">College Central</h2>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-gray-600">{user?.name || 'User'}</span>
-            <button onClick={onLogout} className="rounded bg-gray-800 text-white px-3 py-1.5 hover:bg-black">Logout</button>
+
+          <nav className="flex-1 space-y-2 p-4">
+            <NavLink to="/dashboard" end className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
+              <span className="material-symbols-outlined">dashboard</span>
+              Dashboard
+            </NavLink>
+            <NavLink to="/admissions" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
+              <span className="material-symbols-outlined">school</span>
+              Admissions
+            </NavLink>
+            <NavLink to="/fees" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
+              <span className="material-symbols-outlined">payments</span>
+              Fee Management
+            </NavLink>
+            <NavLink to="/hostel" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
+              <span className="material-symbols-outlined">night_shelter</span>
+              Hostel Allocation
+            </NavLink>
+            <NavLink to="/library" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
+              <span className="material-symbols-outlined">history_edu</span>
+              Library
+            </NavLink>
+            <NavLink to="/student" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
+              <span className="material-symbols-outlined">badge</span>
+              Student
+            </NavLink>
+          </nav>
+
+          <div className="p-4 border-t border-secondary-200">
+            <a className={`${navBase} ${navInactive}`} href="#">
+              <span className="material-symbols-outlined">settings</span>
+              Settings
+            </a>
+            <button onClick={onLogout} className={`${navBase} ${navInactive} w-full text-left`}>
+              <span className="material-symbols-outlined">logout</span>
+              Logout
+            </button>
           </div>
-        </div>
-      </header>
+        </aside>
 
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex gap-2 mb-4">
-          <NavLink to="/dashboard" className={({ isActive }) => `${linkBase} ${isActive ? active : inactive}`} end>Dashboard</NavLink>
-          <NavLink to="/admissions" className={({ isActive }) => `${linkBase} ${isActive ? active : inactive}`}>Admissions</NavLink>
-          <NavLink to="/hostel" className={({ isActive }) => `${linkBase} ${isActive ? active : inactive}`}>Hostel</NavLink>
-          <NavLink to="/library" className={({ isActive }) => `${linkBase} ${isActive ? active : inactive}`}>Library</NavLink>
-          <NavLink to="/student" className={({ isActive }) => `${linkBase} ${isActive ? active : inactive}`}>Student</NavLink>
-        </div>
-
-        <div className="bg-white border rounded-lg">
-          <Outlet />
+        {/* Main content */}
+        <div className="flex-1">
+          <main className="flex-1 px-8 py-8 md:px-12 lg:px-16">
+            <div className="mx-auto max-w-7xl">
+              <Outlet />
+            </div>
+          </main>
         </div>
       </div>
     </div>

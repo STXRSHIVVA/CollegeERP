@@ -1,5 +1,5 @@
-import AdminDashboard from "../components/AdminDashboard.jsx"
+import DashboardPage from "../pages/DashboardPage.jsx"
 
 export default function DashboardRoute() {
-  return <AdminDashboard />
+  return <DashboardPage />
 }

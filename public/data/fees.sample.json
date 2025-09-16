@@ -1,0 +1,56 @@
+[
+  {
+    "transactionId": "TXN12345",
+    "studentName": "Ethan Harper",
+    "amount": 500,
+    "method": "Credit Card",
+    "status": "Completed",
+    "date": "2024-07-26T10:30:00Z",
+    "receiptUrl": ""
+  },
+  {
+    "transactionId": "TXN67890",
+    "studentName": "Olivia Bennett",
+    "amount": 300,
+    "method": "Online Banking",
+    "status": "Completed",
+    "date": "2024-07-25T12:00:00Z",
+    "receiptUrl": ""
+  },
+  {
+    "transactionId": "TXN24680",
+    "studentName": "Noah Carter",
+    "amount": 250,
+    "method": "Credit Card",
+    "status": "Completed",
+    "date": "2024-07-24T08:45:00Z",
+    "receiptUrl": ""
+  },
+  {
+    "transactionId": "TXN13579",
+    "studentName": "Ava Davis",
+    "amount": 400,
+    "method": "Online Banking",
+    "status": "Pending",
+    "date": "2024-07-23T14:15:00Z",
+    "receiptUrl": ""
+  },
+  {
+    "transactionId": "TXN98765",
+    "studentName": "Liam Evans",
+    "amount": 150,
+    "method": "Credit Card",
+    "status": "Failed",
+    "date": "2024-07-22T09:20:00Z",
+    "receiptUrl": ""
+  },
+  {
+    "transactionId": "TXN54321",
+    "studentName": "Sophia Foster",
+    "amount": 200,
+    "method": "Online Banking",
+    "status": "Completed",
+    "date": "2024-07-21T11:05:00Z",
+    "receiptUrl": ""
+  }
+]

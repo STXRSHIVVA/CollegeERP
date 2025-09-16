@@ -23,7 +23,7 @@ const AdmissionForm = () => {
         course: 'Computer Science',
         hostel: 'No',
         transport: 'No',
-        feeStatus: 'Paid Online (Simulated)'
+        feeStatus: 'Paid Online'
     });
 
     // New state to manage the submission loading status
@@ -154,7 +154,7 @@ const AdmissionForm = () => {
                             <div className="sm:col-span-3"><label htmlFor="guardianName" className="block text-sm font-medium leading-6 text-gray-900">Guardian's Name</label><div className="mt-2"><input type="text" name="guardianName" id="guardianName" value={formData.guardianName} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
                             <div className="sm:col-span-3"><label htmlFor="guardianMobile" className="block text-sm font-medium leading-6 text-gray-900">Guardian's Mobile</label><div className="mt-2"><input type="tel" name="guardianMobile" id="guardianMobile" value={formData.guardianMobile} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
                             <div className="sm:col-span-3"><label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">Email address</label><div className="mt-2"><input id="email" name="email" type="email" value={formData.email} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
-                            <div className="sm:col-span-3"><label htmlFor="mobile" className="block text-sm font-medium leading-6 text-gray-900">Mobile Number</label><div className="mt-2"><input type="tel" name="mobile" id="mobile" value={formData.mobile} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="mobile" className="block text sm font-medium leading-6 text-gray-900">Mobile Number</label><div className="mt-2"><input type="tel" name="mobile" id="mobile" value={formData.mobile} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
                             <div className="col-span-full"><label htmlFor="address" className="block text-sm font-medium leading-6 text-gray-900">Street address</label><div className="mt-2"><input type="text" name="address" id="address" value={formData.address} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
                             <div className="sm:col-span-2 sm:col-start-1"><label htmlFor="city" className="block text-sm font-medium leading-6 text-gray-900">City</label><div className="mt-2"><input type="text" name="city" id="city" value={formData.city} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
                             <div className="sm:col-span-2"><label htmlFor="state" className="block text-sm font-medium leading-6 text-gray-900">State / Province</label><div className="mt-2"><input type="text" name="state" id="state" value={formData.state} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
@@ -182,7 +182,7 @@ const AdmissionForm = () => {
                     <div className="mt-2">
                         <select id="feeStatus" name="feeStatus" value={formData.feeStatus} onChange={handleChange}
                             className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600">
-                            <option>Paid Online </option>
+                            <option>Paid Online</option>
                             <option>To Be Paid at Counter</option>
                         </select>
                     </div>

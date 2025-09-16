@@ -7,6 +7,7 @@ import AdmissionsRoute from "./routes/Admissions.jsx"
 import HostelRoute from "./routes/Hostel.jsx"
 import LibraryRoute from "./routes/Library.jsx"
 import StudentRoute from "./routes/Student.jsx"
+import FeeRoute from "./routes/Fee.jsx"
 
 function App() {
   const [user, setUser] = useState(null)
@@ -43,6 +44,7 @@ function App() {
           <Route path="/hostel" element={<HostelRoute />} />
           <Route path="/library" element={<LibraryRoute />} />
           <Route path="/student" element={<StudentRoute />} />
+          <Route path="/fees" element={<FeeRoute />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>
