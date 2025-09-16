@@ -1,0 +1,207 @@
+import React, { useState } from 'react'; // Removed useEffect as it's no longer needed here
+
+const AdmissionForm = () => {
+    // State for all your detailed form fields
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        dob: '',
+        gender: '',
+        email: '',
+        mobile: '',
+        guardianName: '',
+        guardianMobile: '',
+        address: '',
+        city: '',
+        state: '',
+        zip: '',
+        nationality: 'Indian',
+        category: 'General',
+        previousInstitute: '',
+        yearOfPassing: '',
+        percentage: '',
+        course: 'Computer Science',
+        hostel: 'No',
+        transport: 'No',
+        feeStatus: 'Paid Online (Simulated)'
+    });
+
+    // New state to manage the submission loading status
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    // New state to hold receipt details (if returned by backend)
+    const [receipt, setReceipt] = useState(null);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prevState => ({
+            ...prevState,
+            [name]: value
+        }));
+    };
+
+    // --- THIS IS THE UPDATED FUNCTION ---
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+
+        const scriptURL = import.meta.env.VITE_APPS_SCRIPT_URL;
+
+        if (!scriptURL) {
+            alert('Missing VITE_APPS_SCRIPT_URL in your environment. Submissions will not be sent.');
+            setIsSubmitting(false);
+            return;
+        }
+
+        try {
+            const response = await fetch(scriptURL, {
+                method: 'POST',
+                body: JSON.stringify(formData),
+                headers: {
+                    'Content-Type': 'text/plain', // Use text/plain for Apps Script web apps
+                },
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`Network error: ${response.status} ${response.statusText} - ${text}`);
+            }
+
+            const result = await response.json();
+
+            if (result.result === 'success') {
+                alert(`Application Submitted Successfully! Your Application ID is: ${result.applicationId}`);
+                // If backend returns receipt info, store it for display/print
+                const r = {
+                    applicationId: result.applicationId,
+                    receiptNumber: result.receiptNumber || result.receiptId || null,
+                    amount: result.amount || result.feeAmount || null,
+                    method: formData.feeStatus,
+                    applicant: `${formData.firstName} ${formData.lastName}`.trim(),
+                    email: formData.email,
+                    timestamp: result.timestamp || new Date().toISOString(),
+                };
+                // Only set receipt if we have at least an applicationId
+                if (r.applicationId) setReceipt(r);
+                // Optionally reset form
+                // setFormData({ ...initial state... })
+            } else {
+                throw new Error(result.error || 'An unknown error occurred in the script.');
+            }
+        } catch (error) {
+            console.error('Error submitting the form:', error);
+            alert(`An error occurred while submitting. ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handlePrintReceipt = () => {
+        if (!receipt) return;
+        const lines = [
+            `<h2 style="margin:0 0 12px">Application Fee Receipt</h2>`,
+            `<div><strong>Application ID:</strong> ${receipt.applicationId}</div>`,
+            receipt.receiptNumber ? `<div><strong>Receipt No:</strong> ${receipt.receiptNumber}</div>` : '',
+            receipt.amount != null ? `<div><strong>Amount:</strong> ${receipt.amount}</div>` : '',
+            `<div><strong>Payment Method:</strong> ${receipt.method}</div>`,
+            receipt.applicant ? `<div><strong>Applicant:</strong> ${receipt.applicant}</div>` : '',
+            receipt.email ? `<div><strong>Email:</strong> ${receipt.email}</div>` : '',
+            `<div><strong>Date:</strong> ${new Date(receipt.timestamp).toLocaleString()}</div>`
+        ].filter(Boolean);
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Receipt ${receipt.applicationId}</title></head><body style="font-family:ui-sans-serif,system-ui,Arial;padding:24px;">${lines.join('')}<hr/><p style="font-size:12px;color:#666">This is a system-generated receipt.</p></body></html>`;
+        const w = window.open('', '_blank');
+        if (w) {
+            w.document.open();
+            w.document.write(html);
+            w.document.close();
+            w.focus();
+            w.print();
+        }
+    };
+
+    return (
+        <div className="bg-blue-50 min-h-screen py-10 px-4 sm:px-6 lg:px-8">
+            {/* Receipt banner */}
+            {receipt && (
+                <div className="max-w-4xl mx-auto mb-4 rounded border border-green-200 bg-green-50 text-green-800 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <p className="font-semibold">Fee receipt generated for Application ID {receipt.applicationId}</p>
+                            <p className="text-sm">{receipt.receiptNumber ? `Receipt No: ${receipt.receiptNumber}` : 'No receipt number provided by backend'}</p>
+                        </div>
+                        <button onClick={handlePrintReceipt} className="rounded bg-green-600 text-white px-3 py-1.5 hover:bg-green-700">Print / Download</button>
+                    </div>
+                </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-xl">
+                <div className="space-y-12">
+
+                    <div className="border-b border-gray-200/90 pb-12">
+                        <h2 className="text-2xl font-bold leading-7 text-purple-700">College Admission Portal</h2>
+                        <p className="mt-2 text-md leading-6 text-gray-700">Welcome! Please fill in your details to begin your journey with us.</p>
+                    </div>
+
+                    {/* Personal & Guardian Details */}
+                    <div className="border-b border-gray-200/90 pb-12">
+                        <h2 className="text-xl font-semibold leading-7 text-purple-700">1. Personal & Guardian Information</h2>
+                        <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+                            <div className="sm:col-span-3"><label htmlFor="firstName" className="block text-sm font-medium leading-6 text-gray-900">First name</label><div className="mt-2"><input type="text" name="firstName" id="firstName" value={formData.firstName} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="lastName" className="block text-sm font-medium leading-6 text-gray-900">Last name</label><div className="mt-2"><input type="text" name="lastName" id="lastName" value={formData.lastName} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="dob" className="block text-sm font-medium leading-6 text-gray-900">Date of Birth</label><div className="mt-2"><input type="date" name="dob" id="dob" value={formData.dob} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="gender" className="block text-sm font-medium leading-6 text-gray-900">Gender</label><div className="mt-2"><select id="gender" name="gender" value={formData.gender} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="nationality" className="block text-sm font-medium leading-6 text-gray-900">Nationality</label><div className="mt-2"><input type="text" name="nationality" id="nationality" value={formData.nationality} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="category" className="block text-sm font-medium leading-6 text-gray-900">Admission Category</label><div className="mt-2"><select id="category" name="category" value={formData.category} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600"><option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option></select></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="guardianName" className="block text-sm font-medium leading-6 text-gray-900">Guardian's Name</label><div className="mt-2"><input type="text" name="guardianName" id="guardianName" value={formData.guardianName} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="guardianMobile" className="block text-sm font-medium leading-6 text-gray-900">Guardian's Mobile</label><div className="mt-2"><input type="tel" name="guardianMobile" id="guardianMobile" value={formData.guardianMobile} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">Email address</label><div className="mt-2"><input id="email" name="email" type="email" value={formData.email} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="mobile" className="block text-sm font-medium leading-6 text-gray-900">Mobile Number</label><div className="mt-2"><input type="tel" name="mobile" id="mobile" value={formData.mobile} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="col-span-full"><label htmlFor="address" className="block text-sm font-medium leading-6 text-gray-900">Street address</label><div className="mt-2"><input type="text" name="address" id="address" value={formData.address} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-2 sm:col-start-1"><label htmlFor="city" className="block text-sm font-medium leading-6 text-gray-900">City</label><div className="mt-2"><input type="text" name="city" id="city" value={formData.city} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-2"><label htmlFor="state" className="block text-sm font-medium leading-6 text-gray-900">State / Province</label><div className="mt-2"><input type="text" name="state" id="state" value={formData.state} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-2"><label htmlFor="zip" className="block text-sm font-medium leading-6 text-gray-900">ZIP / Postal code</label><div className="mt-2"><input type="text" name="zip" id="zip" value={formData.zip} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                        </div>
+                    </div>
+
+                    {/* Academic & Course Details */}
+                    <div className="border-b border-gray-200/90 pb-12">
+                        <h2 className="text-xl font-semibold leading-7 text-purple-700">2. Academic & Course Details</h2>
+                        <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+                            <div className="sm:col-span-full"><label htmlFor="previousInstitute" className="block text-sm font-medium leading-6 text-gray-900">Previous Institute Name</label><div className="mt-2"><input type="text" name="previousInstitute" id="previousInstitute" value={formData.previousInstitute} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="yearOfPassing" className="block text-sm font-medium leading-6 text-gray-900">Year of Passing</label><div className="mt-2"><input type="text" name="yearOfPassing" id="yearOfPassing" value={formData.yearOfPassing} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-3"><label htmlFor="percentage" className="block text-sm font-medium leading-6 text-gray-900">Percentage / GPA</label><div className="mt-2"><input type="text" name="percentage" id="percentage" value={formData.percentage} onChange={handleChange} required className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600" /></div></div>
+                            <div className="sm:col-span-2"><label htmlFor="course" className="block text-sm font-medium leading-6 text-gray-900">Select Course</label><div className="mt-2"><select id="course" name="course" value={formData.course} onChange={handleChange} className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600"><option>Computer Science</option><option>Electronics</option><option>Mechanical</option><option>Civil</option></select></div></div>
+                            <div className="sm:col-span-2"><label htmlFor="hostel" className="block text-sm font-medium leading-6 text-gray-900">Hostel Required</label><div className="mt-2"><select id="hostel" name="hostel" value={formData.hostel} onChange={handleChange} className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600"><option>No</option><option>Yes</option></select></div></div>
+                            <div className="sm:col-span-2"><label htmlFor="transport" className="block text-sm font-medium leading-6 text-gray-900">Transport Required</label><div className="mt-2"><select id="transport" name="transport" value={formData.transport} onChange={handleChange} className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600"><option>No</option><option>Yes</option></select></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ... inside the second <fieldset> or details section ... */}
+                <div className="sm:col-span-full"> {/* <-- Add this block */}
+                    <label htmlFor="feeStatus" className="block text-sm font-medium leading-6 text-gray-900">Application Fee</label>
+                    <div className="mt-2">
+                        <select id="feeStatus" name="feeStatus" value={formData.feeStatus} onChange={handleChange}
+                            className="block w-full rounded-md border-gray-300 border py-2 text-gray-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600">
+                            <option>Paid Online </option>
+                            <option>To Be Paid at Counter</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="mt-6 flex items-center justify-end gap-x-6">
+                    <button type="button" className="text-sm font-semibold leading-6 text-gray-900 hover:text-gray-700">Cancel</button>
+                    {/* --- THIS IS THE UPDATED BUTTON --- */}
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="rounded-md bg-indigo-600 px-4 py-2 text-md font-semibold text-white shadow-md hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                        {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+};
+
+export default AdmissionForm;

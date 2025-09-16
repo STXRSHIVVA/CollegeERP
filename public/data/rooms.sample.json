@@ -1,0 +1,7 @@
+[
+  { "RoomNumber": "101", "Status": "Occupied" },
+  { "RoomNumber": "102", "Status": "Available" },
+  { "RoomNumber": "103", "Status": "Occupied" },
+  { "RoomNumber": "104", "Status": "Available" },
+  { "RoomNumber": "105", "Status": "Available" }
+]

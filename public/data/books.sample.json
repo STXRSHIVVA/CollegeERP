@@ -1,0 +1,5 @@
+[
+  { "BookId": "B001", "Title": "Clean Code", "Author": "Robert C. Martin", "Status": "Available" },
+  { "BookId": "B002", "Title": "You Don't Know JS", "Author": "Kyle Simpson", "Status": "Issued", "AssignedToStudentId": "APP-1002" },
+  { "BookId": "B003", "Title": "Introduction to Algorithms", "Author": "Cormen et al.", "Status": "Available" }
+]
