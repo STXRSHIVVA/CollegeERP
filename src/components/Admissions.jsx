@@ -209,7 +209,7 @@ const AdmissionForm = () => {
             return;
         }
 
-        const wantsOnline = String(formData.feeStatus).toLowerCase().includes('paid');
+        const wantsOnline = String(formData.feeStatus).trim().toLowerCase() === 'paid online';
 
         try {
             if (wantsOnline) {
@@ -286,6 +286,9 @@ const AdmissionForm = () => {
         }
     };
 
+    // Compute online mode once for rendering logic
+    const wantsOnline = String(formData.feeStatus).trim().toLowerCase() === 'paid online';
+
     return (
         <div className="bg-blue-50 min-h-screen py-10 px-4 sm:px-6 lg:px-8">
             {/* Receipt banner */}
@@ -361,7 +364,7 @@ const AdmissionForm = () => {
                             <option>To Be Paid at Counter</option>
                         </select>
                     </div>
-                    {String(formData.feeStatus).toLowerCase().includes('paid') && (
+                    {wantsOnline && (
                         <>
                             <p className="mt-2 text-sm text-gray-600">After you click Pay Now, a Razorpay window will open to pay ₹{APPLICATION_FEE_INR} using UPI, card, netbanking, or other enabled methods. Payment will be auto-verified.</p>
                             {!paymentVerified ? (
@@ -385,7 +388,7 @@ const AdmissionForm = () => {
                     {/* --- UPDATED: disable submit until paid in online mode --- */}
                     <button
                         type="submit"
-                        disabled={isSubmitting || (String(formData.feeStatus).toLowerCase().includes('paid') && !paymentVerified)}
+                        disabled={isSubmitting || (wantsOnline && !paymentVerified)}
                         className="rounded-md bg-indigo-600 px-4 py-2 text-md font-semibold text-white shadow-md hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? 'Submitting...' : 'Submit Application'}
