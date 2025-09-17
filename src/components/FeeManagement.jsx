@@ -350,7 +350,16 @@ const FeeManagement = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
-                  <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-500">Loading fee data...</td></tr>
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12">
+                      <div className="flex items-center justify-center">
+                        <div className="inline-flex flex-col items-center" role="status" aria-live="polite" aria-busy="true">
+                          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+                          <div className="mt-3 text-xs text-gray-500">Loading fee data…</div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-500">No transactions found.</td></tr>
                 ) : (

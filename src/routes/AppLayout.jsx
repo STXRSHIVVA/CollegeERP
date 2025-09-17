@@ -9,7 +9,7 @@ export default function AppLayout({ user, onLogout }) {
     <div className="bg-secondary-50 min-h-screen font-sans">
       <div className="relative flex min-h-screen w-full overflow-x-hidden">
         {/* Sidebar */}
-        <aside className="flex w-64 flex-col bg-white border-r border-secondary-200">
+        <aside className="flex w-64 flex-col bg-white border-r border-secondary-200" aria-label={`Signed in as ${user?.name || user?.email || 'User'}`}>
           <div className="flex items-center gap-3 px-6 py-4 text-secondary-800 border-b border-secondary-200">
             <div className="size-8 text-primary-600">
               <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -48,6 +48,9 @@ export default function AppLayout({ user, onLogout }) {
           </nav>
 
           <div className="p-4 border-t border-secondary-200">
+            <div className="mb-2 text-xs text-secondary-500 truncate" title={user?.email || user?.name || ''}>
+              Signed in as <span className="font-medium text-secondary-800">{user?.name || user?.email || 'User'}</span>
+            </div>
             <a className={`${navBase} ${navInactive}`} href="#">
               <span className="material-symbols-outlined">settings</span>
               Settings

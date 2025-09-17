@@ -167,7 +167,14 @@ export default function StudentRoute() {
         <button onClick={search} disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50">Search</button>
       </div>
 
-      {loading && <div className="p-4 text-gray-600">Loading…</div>}
+      {loading && (
+        <div className="p-6 flex items-center justify-center">
+          <div className="inline-flex flex-col items-center" role="status" aria-live="polite" aria-busy="true">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-500 border-t-transparent"></div>
+            <div className="mt-3 text-sm text-gray-500">Loading…</div>
+          </div>
+        </div>
+      )}
       {error && <div className="p-3 text-red-700 bg-red-50 border border-red-200 rounded">{error}</div>}
 
       {result && result.results && (

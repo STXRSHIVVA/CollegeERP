@@ -1,7 +1,117 @@
+function getRzpCreds_() {
+  const props = PropertiesService.getScriptProperties();
+  const keyId = props.getProperty('RZP_KEY_ID');
+  const keySecret = props.getProperty('RZP_KEY_SECRET');
+  if (!keyId || !keySecret) throw new Error('Razorpay keys not set. Define RZP_KEY_ID and RZP_KEY_SECRET in Script Properties.');
+  return { keyId, keySecret };
+}
+
+function createRazorpayOrder_(amountPaise, receipt, notes) {
+  const { keyId, keySecret } = getRzpCreds_();
+  const url = 'https://api.razorpay.com/v1/orders';
+  const payload = {
+    amount: Number(amountPaise || 0),
+    currency: 'INR',
+    receipt: String(receipt || ''),
+    payment_capture: 1,
+    notes: notes || {}
+  };
+  const resp = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    headers: { Authorization: 'Basic ' + Utilities.base64Encode(getRzpCreds_().keyId + ':' + getRzpCreds_().keySecret) },
+    muteHttpExceptions: true
+  });
+  const code = resp.getResponseCode();
+  const text = resp.getContentText();
+  if (code < 200 || code >= 300) {
+    throw new Error('Razorpay order error ' + code + ': ' + text);
+  }
+  const obj = JSON.parse(text);
+  return { orderId: obj.id, amount: obj.amount, currency: obj.currency, keyId };
+}
+
+function toHex_(bytes) {
+  return bytes.map(function (b) { const v = (b < 0 ? b + 256 : b); return ('0' + v.toString(16)).slice(-2); }).join('');
+}
+
+function verifyRazorpayPayment_(applicationId, orderId, paymentId, signature, amountPaise) {
+  const { keySecret } = getRzpCreds_();
+  const message = String(orderId) + '|' + String(paymentId);
+  const expected = toHex_(Utilities.computeHmacSha256Signature(message, keySecret));
+  const ok = expected === String(signature || '').trim();
+
+  if (!ok) return { result: 'error', verified: false, message: 'Signature mismatch' };
+
+  // Record fee
+  const ss = SpreadsheetApp.getActive();
+  const feesSheet = ss.getSheetByName('Fees');
+  const amount = Number(amountPaise || 0) / 100;
+  const now = new Date();
+  if (feesSheet) {
+    feesSheet.appendRow([
+      String(paymentId), // TransactionId
+      String(applicationId || ''), // ApplicationId
+      amount, // Amount
+      now, // Date
+      'Razorpay', // Mode
+      'Completed', // Status
+      'Application Fee' // Type/Description
+    ]);
+  }
+
+  // Update submission fee status if possible
+  const subsSheet = ss.getSheetByName('Submissions');
+  if (subsSheet && applicationId) {
+    const data = subsSheet.getDataRange().getValues();
+    if (data.length >= 2) {
+      const headers = data[0].map(h => String(h || ''));
+      const idxApp = colIndex_(headers, ['ApplicationId','applicationId','Application ID']);
+      const idxFee = colIndex_(headers, ['FeeStatus','Fee Status','Payment Status','Fee','Fees']);
+      for (let r = 1; r < data.length; r++) {
+        if (String(data[r][idxApp]) === String(applicationId)) {
+          if (idxFee >= 0) subsSheet.getRange(r + 1, idxFee + 1).setValue('Paid Online');
+          break;
+        }
+      }
+    }
+  }
+
+  // Email receipt
+  try {
+    const sub = getSubmissionByAppId_(applicationId);
+    if (sub && sub.Email) {
+      const ts = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss z');
+      sendReceiptEmail_(String(sub.Email), {
+        applicationId,
+        receiptNumber: String(paymentId),
+        amount,
+        timestamp: ts,
+        fullName: `${sub.FirstName || ''} ${sub.LastName || ''}`.trim()
+      });
+    }
+  } catch (e) { Logger.log('Email send failed: ' + e); }
+
+  return { result: 'success', verified: true, receiptNumber: String(paymentId), amount };
+}
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData?.contents || '{}');
     const action = data.action;
+
+    // Razorpay: create order
+    if (action === 'createRazorpayOrder') {
+      const out = createRazorpayOrder_(data.amountPaise, data.receipt, data.notes);
+      return json_(Object.assign({ result: 'success' }, out));
+    }
+
+    // Razorpay: verify payment
+    if (action === 'verifyRazorpayPayment') {
+      const out = verifyRazorpayPayment_(data.applicationId, data.orderId, data.paymentId, data.signature, data.amountPaise);
+      return json_(out);
+    }
 
     // Assign hostel room
     if (action === 'assignHostelRoom') {
@@ -43,7 +153,7 @@ function doPost(e) {
       ];
       submissionsSheet.appendRow(newRow);
 
-      // Simulated fee entry if paid and return receipt info
+      // Only simulate fee if declared already paid (to avoid double entry with Razorpay flow)
       const feeVal = String(data.feeStatus || '').toLowerCase();
       let receiptNumber = null;
       let amount = 0;

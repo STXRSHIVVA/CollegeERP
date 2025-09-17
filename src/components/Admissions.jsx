@@ -1,4 +1,15 @@
-import React, { useState } from 'react'; // Removed useEffect as it's no longer needed here
+import React, { useState, useRef } from 'react'; // Removed useEffect as it's no longer needed here
+
+const APPLICATION_FEE_INR = Number(import.meta.env.VITE_APPLICATION_FEE_INR || 500);
+let razorpayScriptLoaded = false;
+const loadRazorpayScript = () => new Promise((resolve, reject) => {
+    if (razorpayScriptLoaded && window.Razorpay) return resolve(true);
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => { razorpayScriptLoaded = true; resolve(true); };
+    script.onerror = () => reject(new Error('Failed to load Razorpay checkout'));
+    document.body.appendChild(script);
+});
 
 const AdmissionForm = () => {
     // State for all your detailed form fields
@@ -30,6 +41,13 @@ const AdmissionForm = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     // New state to hold receipt details (if returned by backend)
     const [receipt, setReceipt] = useState(null);
+    const [paymentError, setPaymentError] = useState('');
+    // New states for online payment flow
+    const [applicationId, setApplicationId] = useState(null);
+    const [paymentVerified, setPaymentVerified] = useState(false);
+    const [isPaying, setIsPaying] = useState(false);
+
+    const formRef = useRef(null);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -37,11 +55,150 @@ const AdmissionForm = () => {
             ...prevState,
             [name]: value
         }));
+        if (name === 'feeStatus') {
+            // Reset payment state when toggling payment method
+            setPaymentError('');
+            setPaymentVerified(false);
+        }
     };
 
-    // --- THIS IS THE UPDATED FUNCTION ---
+    async function createRzpOrder(scriptURL, applicationId) {
+        const amountPaise = Math.round(APPLICATION_FEE_INR * 100);
+        const resp = await fetch(scriptURL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'createRazorpayOrder', amountPaise, receipt: applicationId, notes: { applicationId } })
+        });
+        if (!resp.ok) throw new Error('Failed to create Razorpay order');
+        const json = await resp.json();
+        if (json.result !== 'success') throw new Error(json.message || 'Order creation failed');
+        return json; // { orderId, amount, currency, keyId }
+    }
+
+    async function verifyRzpPayment(scriptURL, applicationId, orderId, paymentId, signature) {
+        const amountPaise = Math.round(APPLICATION_FEE_INR * 100);
+        const resp = await fetch(scriptURL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'verifyRazorpayPayment', applicationId, orderId, paymentId, signature, amountPaise })
+        });
+        if (!resp.ok) throw new Error('Failed to verify payment');
+        return resp.json();
+    }
+
+    // Create (or reuse) a provisional application to obtain applicationId before payment
+    async function ensureApplicationCreated(scriptURL) {
+        if (applicationId) return applicationId;
+        const payload = { ...formData, action: 'submitAdmission', feeStatus: 'To Be Paid at Counter' };
+        const response = await fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'text/plain' },
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Network error: ${response.status} ${response.statusText} - ${text}`);
+        }
+        const result = await response.json();
+        if (result.result !== 'success') {
+            throw new Error(result.error || 'An unknown error occurred in the script.');
+        }
+        setApplicationId(result.applicationId);
+        return result.applicationId;
+    }
+
+    // New: Dedicated Pay Now handler for online payments
+    const handlePayNow = async () => {
+        setPaymentError('');
+        const scriptURL = import.meta.env.VITE_APPS_SCRIPT_URL;
+        if (!scriptURL) {
+            alert('Missing VITE_APPS_SCRIPT_URL in your environment. Payments cannot proceed.');
+            return;
+        }
+        // HTML5 validation for required fields without submitting form
+        if (formRef.current && !formRef.current.reportValidity()) {
+            return;
+        }
+        setIsPaying(true);
+        try {
+            const appId = await ensureApplicationCreated(scriptURL);
+            await loadRazorpayScript();
+            const order = await createRzpOrder(scriptURL, appId);
+
+            const options = {
+                key: order.keyId,
+                amount: order.amount,
+                currency: order.currency || 'INR',
+                name: 'College ERP Admissions',
+                description: `Application Fee for ${appId}`,
+                order_id: order.orderId,
+                prefill: {
+                    name: `${formData.firstName} ${formData.lastName}`.trim(),
+                    email: formData.email,
+                    contact: formData.mobile,
+                },
+                theme: { color: '#4f46e5' },
+                // Removed method filter to allow any enabled method (UPI, card, netbanking, wallets, etc.)
+                handler: async function (resp) {
+                    try {
+                        const ver = await verifyRzpPayment(
+                            scriptURL,
+                            appId,
+                            resp.razorpay_order_id,
+                            resp.razorpay_payment_id,
+                            resp.razorpay_signature
+                        );
+                        if (ver.result === 'success' && ver.verified) {
+                            const r = {
+                                applicationId: appId,
+                                receiptNumber: ver.receiptNumber || resp.razorpay_payment_id,
+                                amount: ver.amount || APPLICATION_FEE_INR,
+                                method: 'Paid Online (Razorpay)',
+                                applicant: `${formData.firstName} ${formData.lastName}`.trim(),
+                                email: formData.email,
+                                timestamp: new Date().toISOString(),
+                            };
+                            setReceipt(r);
+                            setPaymentVerified(true);
+                            setIsPaying(false);
+                            alert('Payment successful and verified. You can now submit your application.');
+                        } else {
+                            setPaymentError('Payment could not be verified. Please contact support.');
+                            setIsPaying(false);
+                            alert('Payment could not be verified.');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        setPaymentError(err.message || 'Verification failed');
+                        setIsPaying(false);
+                        alert('Verification failed.');
+                    }
+                },
+                modal: {
+                    ondismiss: function () {
+                        setIsPaying(false);
+                    }
+                }
+            };
+
+            const rzp = new window.Razorpay(options);
+            rzp.on('payment.failed', function (resp) {
+                setPaymentError(resp.error && resp.error.description ? resp.error.description : 'Payment failed');
+                alert('Payment failed. You can retry by clicking Pay Now again.');
+                setIsPaying(false);
+            });
+            rzp.open();
+        } catch (error) {
+            console.error('Error initiating payment:', error);
+            setPaymentError(error.message || 'Unable to start payment');
+            setIsPaying(false);
+        }
+    };
+
+    // --- UPDATED SUBMIT: enforce payment first for online mode ---
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setPaymentError('');
         setIsSubmitting(true);
 
         const scriptURL = import.meta.env.VITE_APPS_SCRIPT_URL;
@@ -52,13 +209,27 @@ const AdmissionForm = () => {
             return;
         }
 
+        const wantsOnline = String(formData.feeStatus).toLowerCase().includes('paid');
+
         try {
+            if (wantsOnline) {
+                if (!paymentVerified) {
+                    setPaymentError('Please complete payment by clicking Pay Now before submitting.');
+                    setIsSubmitting(false);
+                    return;
+                }
+                // Application was already created during Pay Now. Treat as submitted.
+                alert(`Application Submitted Successfully! Your Application ID is: ${applicationId || 'N/A'}`);
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Counter payment flow unchanged
+            const payload = { ...formData, action: 'submitAdmission' };
             const response = await fetch(scriptURL, {
                 method: 'POST',
-                body: JSON.stringify(formData),
-                headers: {
-                    'Content-Type': 'text/plain', // Use text/plain for Apps Script web apps
-                },
+                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'text/plain' },
             });
 
             if (!response.ok) {
@@ -68,28 +239,25 @@ const AdmissionForm = () => {
 
             const result = await response.json();
 
-            if (result.result === 'success') {
-                alert(`Application Submitted Successfully! Your Application ID is: ${result.applicationId}`);
-                // If backend returns receipt info, store it for display/print
-                const r = {
-                    applicationId: result.applicationId,
-                    receiptNumber: result.receiptNumber || result.receiptId || null,
-                    amount: result.amount || result.feeAmount || null,
-                    method: formData.feeStatus,
-                    applicant: `${formData.firstName} ${formData.lastName}`.trim(),
-                    email: formData.email,
-                    timestamp: result.timestamp || new Date().toISOString(),
-                };
-                // Only set receipt if we have at least an applicationId
-                if (r.applicationId) setReceipt(r);
-                // Optionally reset form
-                // setFormData({ ...initial state... })
-            } else {
+            if (result.result !== 'success') {
                 throw new Error(result.error || 'An unknown error occurred in the script.');
             }
+
+            const appId = result.applicationId;
+            alert(`Application Submitted Successfully! Your Application ID is: ${appId}`);
+            const r = {
+                applicationId: appId,
+                receiptNumber: result.receiptNumber || result.receiptId || null,
+                amount: result.amount || result.feeAmount || null,
+                method: formData.feeStatus,
+                applicant: `${formData.firstName} ${formData.lastName}`.trim(),
+                email: formData.email,
+                timestamp: result.timestamp || new Date().toISOString(),
+            };
+            if (r.applicationId) setReceipt(r);
         } catch (error) {
-            console.error('Error submitting the form:', error);
-            alert(`An error occurred while submitting. ${error.message}`);
+            console.error('Error submitting:', error);
+            alert(`An error occurred. ${error.message}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -133,7 +301,14 @@ const AdmissionForm = () => {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-xl">
+            {/* Payment error banner */}
+            {paymentError && (
+                <div className="max-w-4xl mx-auto mb-4 rounded border border-red-200 bg-red-50 text-red-800 p-4">
+                    <p className="text-sm">{paymentError}</p>
+                </div>
+            )}
+
+            <form ref={formRef} onSubmit={handleSubmit} className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-xl">
                 <div className="space-y-12">
 
                     <div className="border-b border-gray-200/90 pb-12">
@@ -186,14 +361,31 @@ const AdmissionForm = () => {
                             <option>To Be Paid at Counter</option>
                         </select>
                     </div>
+                    {String(formData.feeStatus).toLowerCase().includes('paid') && (
+                        <>
+                            <p className="mt-2 text-sm text-gray-600">After you click Pay Now, a Razorpay window will open to pay ₹{APPLICATION_FEE_INR} using UPI, card, netbanking, or other enabled methods. Payment will be auto-verified.</p>
+                            {!paymentVerified ? (
+                                <button
+                                    type="button"
+                                    onClick={handlePayNow}
+                                    disabled={isPaying}
+                                    className="mt-3 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                >
+                                    {isPaying ? 'Processing…' : 'Pay Now'}
+                                </button>
+                            ) : (
+                                <p className="mt-3 text-sm text-green-700">Payment verified. You can submit your application now.</p>
+                            )}
+                        </>
+                    )}
                 </div>
 
                 <div className="mt-6 flex items-center justify-end gap-x-6">
                     <button type="button" className="text-sm font-semibold leading-6 text-gray-900 hover:text-gray-700">Cancel</button>
-                    {/* --- THIS IS THE UPDATED BUTTON --- */}
+                    {/* --- UPDATED: disable submit until paid in online mode --- */}
                     <button
                         type="submit"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || (String(formData.feeStatus).toLowerCase().includes('paid') && !paymentVerified)}
                         className="rounded-md bg-indigo-600 px-4 py-2 text-md font-semibold text-white shadow-md hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? 'Submitting...' : 'Submit Application'}
